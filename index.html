@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Image Compressor & Zipper</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 40px;
+    }
+    button {
+      margin: 10px;
+      padding: 10px 15px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    #status {
+      margin-top: 20px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h2>Batch Image Compressor (30% Quality)</h2>
+  <p>Select a folder of images. The tool will create one ZIP with <b>original</b> and <b>compressed</b> folders.</p>
+
+  <input type="file" id="folderUpload" webkitdirectory multiple><br><br>
+  <button id="processBtn">Compress & Download ZIP</button>
+
+  <p id="status"></p>
+
+  <!-- JSZip library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script>
+    const upload = document.getElementById("folderUpload");
+    const processBtn = document.getElementById("processBtn");
+    const status = document.getElementById("status");
+    let files = [];
+
+    upload.addEventListener("change", (event) => {
+      files = [...event.target.files].filter(f => f.type.startsWith("image/"));
+      status.innerText = `${files.length} image(s) selected.`;
+    });
+
+    processBtn.addEventListener("click", async () => {
+      if (files.length === 0) {
+        alert("Please select a folder with images first.");
+        return;
+      }
+
+      status.innerText = "Processing images, please wait...";
+
+      const zip = new JSZip();
+      const originalFolder = zip.folder("original");
+      const compressedFolder = zip.folder("compressed");
+
+      for (const file of files) {
+        // Add original to zip
+        originalFolder.file(file.name, file);
+
+        // Read and compress
+        const dataUrl = await fileToDataURL(file);
+        const compressedBlob = await compressImage(dataUrl, 0.3);
+        compressedFolder.file(file.name.replace(/\.[^/.]+$/, ".jpg"), compressedBlob);
+      }
+
+      // Generate final zip
+      const content = await zip.generateAsync({ type: "blob" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(content);
+      link.download = "images_with_compressed.zip";
+      link.click();
+
+      status.innerText = "✅ Done! ZIP downloaded.";
+    });
+
+    function fileToDataURL(file) {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function compressImage(dataUrl, quality) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.src = dataUrl;
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const ctx = canvas.getContext("2d");
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx.drawImage(img, 0, 0);
+          canvas.toBlob(
+            (blob) => resolve(blob),
+            "image/jpeg",
+            quality
+          );
+        };
+      });
+    }
+  </script>
+</body>
+</html>
